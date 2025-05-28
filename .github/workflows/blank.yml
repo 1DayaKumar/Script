@@ -1,50 +1,26 @@
-import time
-import os
-from dotenv import load_dotenv
-from playwright.sync_api import sync_playwright
+name: Daily Job Apply
 
-load_dotenv()
+on:
+  schedule:
+    - cron: '0 6 * * *'  # Runs every day at 6:00 AM UTC
+  workflow_dispatch:     # Enables manual trigger from GitHub
 
-EMAIL = os.getenv("NAUKRI_EMAIL")
-PASSWORD = os.getenv("NAUKRI_PASSWORD")
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
 
-def apply_jobs():
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        context = browser.new_context()
-        page = context.new_page()
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
 
-        # Step 1: Go to Naukri login
-        page.goto("https://www.naukri.com/")
-        page.click("text=Login")
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          playwright install --with-deps
 
-        # Step 2: Enter credentials
-        page.fill("input[name='username']", EMAIL)
-        page.click("text=Continue")
-        time.sleep(1)
-        page.fill("input[name='password']", PASSWORD)
-        page.click("button[type='submit']")
-        page.wait_for_timeout(5000)
-
-        # Step 3: Go to job search
-        page.goto("https://www.naukri.com/")
-        page.fill("input[placeholder='Skills, Designations, Companies']", "Power BI Developer, Data Analyst")
-        page.fill("input[placeholder='Enter location']", "Hyderabad")
-        page.press("input[placeholder='Enter location']", "Enter")
-        page.wait_for_timeout(5000)
-
-        # Step 4: Apply to jobs
-        job_cards = page.query_selector_all("article.jobTuple")
-        print(f"Found {len(job_cards)} jobs")
-
-        for card in job_cards[:10]:  # Limit to first 10 jobs per run
-            try:
-                apply_btn = card.query_selector("span:has-text('Apply')")
-                if apply_btn:
-                    apply_btn.click()
-                    print("Applied to a job.")
-                    page.wait_for_timeout(2000)
-            except Exception as e:
-                print("Skipped job due to error:", e)
-
-        browser.close()
+      - name: Run Script
+        run: python main.py
