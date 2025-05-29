@@ -1,0 +1,110 @@
+async def linkedin_apply(page):
+    print("Starting LinkedIn job apply...")
+    await page.goto("https://www.linkedin.com/login")
+    await page.fill('input[name="session_key"]', Dayakumar012@gmail.com)
+    await page.fill('input[name="session_password"]', D@987654321k)
+    await page.click('button[type="submit"]')
+    await page.wait_for_load_state("networkidle")
+
+    await page.goto("https://www.linkedin.com/jobs/")
+
+    for keyword in JOB_KEYWORDS:
+        search_url = (
+            f"https://www.linkedin.com/jobs/search/?"
+            f"keywords={keyword}&location={JOB_LOCATION}&f_LF=f_AL&f_TPR=r2592000"
+        )
+        await page.goto(search_url)
+        await page.wait_for_selector("ul.jobs-search-results__list li")  # wait for jobs list
+
+        # get job count initially
+        jobs = await page.query_selector_all("ul.jobs-search-results__list li")
+        print(f"Found {len(jobs)} jobs for '{keyword}' on LinkedIn")
+
+        applied_count = 0
+        idx = 0
+        while idx < len(jobs):
+            try:
+                job = jobs[idx]
+                await job.click()
+                await page.wait_for_selector("div.jobs-description__container")
+
+                job_desc = await page.text_content("div.jobs-description__container")
+                exp_found = any(exp in (job_desc or "").lower() for exp in EXPERIENCE_KEYWORDS)
+                if not exp_found:
+                    print("Skipping job due to experience mismatch.")
+                    idx += 1
+                    continue
+
+                easy_apply = await page.query_selector('button[data-control-name="easy_apply"]')
+                if easy_apply:
+                    await easy_apply.click()
+                    await page.wait_for_selector('button[aria-label="Submit application"]', timeout=5000)
+                    submit_button = await page.query_selector('button[aria-label="Submit application"]')
+                    if submit_button:
+                        await submit_button.click()
+                        print(f"Applied to job: '{keyword}'")
+                        applied_count += 1
+                        await page.wait_for_timeout(3000)
+                    else:
+                        # close and discard complex apply popup
+                        close_button = await page.query_selector('button[aria-label="Dismiss"]')
+                        if close_button:
+                            await close_button.click()
+                            await page.wait_for_timeout(1000)
+                            discard_button = await page.query_selector('button[aria-label="Discard"]')
+                            if discard_button:
+                                await discard_button.click()
+                        print(f"Skipped complex apply job: '{keyword}'")
+                else:
+                    print("Easy Apply not available, skipping.")
+
+            except Exception as e:
+                print(f"Error applying to LinkedIn job: {e}")
+
+            idx += 1
+            # Re-fetch the job list to handle dynamic loading/infinite scroll if needed
+            jobs = await page.query_selector_all("ul.jobs-search-results__list li")
+
+        print(f"LinkedIn apply finished. Total applied: {applied_count}")
+
+async def naukri_apply(page):
+    print("Starting Naukri job apply...")
+    await page.goto("https://www.naukri.com/nlogin/login")
+
+    await page.fill('input[name="email"]', NAUKRI_EMAIL)
+    await page.fill('input[name="password"]', NAUKRI_PASSWORD)
+    await page.click('button[type="submit"]')
+    await page.wait_for_load_state("networkidle")
+
+    for keyword in JOB_KEYWORDS:
+        search_url = f"https://www.naukri.com/{keyword.replace(' ', '-')}-jobs-in-{JOB_LOCATION}"
+        await page.goto(search_url)
+        await page.wait_for_selector('button[data-test-id="apply-button"]')
+
+        apply_buttons = await page.query_selector_all('button[data-test-id="apply-button"]')
+        print(f"Found {len(apply_buttons)} jobs for '{keyword}' on Naukri")
+
+        applied_count = 0
+        idx = 0
+        while idx < len(apply_buttons):
+            try:
+                btn = apply_buttons[idx]
+                await btn.click()
+                await page.wait_for_selector('button[type="submit"]', timeout=7000)
+                confirm_btn = await page.query_selector('button[type="submit"]')
+                if confirm_btn:
+                    await confirm_btn.click()
+                    print(f"Applied to job: '{keyword}' on Naukri")
+                    applied_count += 1
+                    await page.wait_for_timeout(3000)
+                else:
+                    print("Confirm button missing, skipping.")
+
+            except Exception as e:
+                print(f"Error applying to Naukri job: {e}")
+
+            idx += 1
+            # Refresh buttons list to account for dynamic changes
+            apply_buttons = await page.query_selector_all('button[data-test-id="apply-button"]')
+
+        print(f"Naukri apply finished. Total applied: {applied_count}")
